@@ -20,10 +20,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 
-module.exports = {
+module.exports = {//localhost:8545
   defaultNetwork: "localhost",
   networks: {
     hardhat: {
+      gas: 2100000,
+      gasPrice: 8000000000
     },
     mumbai: {
       url: "https://matic-mumbai.chainstacklabs.com",
@@ -40,12 +42,12 @@ module.exports = {
   },
   solidity: {
     version: "0.8.7",
-    /*settings: {
+    settings: {
       optimizer: {
         enabled: true,
-        runs: 100,
+        runs: 1000,
       },
-    },*/
+    },
   },
   paths: {
     sources: "./contracts",
