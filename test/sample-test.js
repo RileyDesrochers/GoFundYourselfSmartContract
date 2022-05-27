@@ -10,7 +10,7 @@ describe("WorkToken", function () {
     
     //expect(await greeter.greet()).to.equal("Hello, world!");
 
-    console.log(owner.address)
+    //console.log(owner.address)
     
     const tx1 = await workToken.newProjectCreater(10, 604800, "this is a URI");
     await tx1.wait();
@@ -19,8 +19,6 @@ describe("WorkToken", function () {
     console.log(tx2)
     /*
     // wait until the transaction is mined
-    
-
     expect(await greeter.greet()).to.equal("Hola, mundo!");
     */
   });

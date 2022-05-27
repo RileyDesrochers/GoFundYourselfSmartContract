@@ -1,10 +1,14 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+//import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "hardhat/console.sol";
 
 struct ProjectCreater { 
    uint256 totalJobCost;
@@ -16,7 +20,9 @@ struct ProjectCreater {
    uint16 jobsCompleted;
 }
 
-contract workToken is ERC721URIStorage, KeeperCompatibleInterface{
+contract workToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
+    using SafeERC20 for IERC20;
+
     uint256 public startTotalJobCost;
     uint16 public jobLimit;
     uint256 public tokenCounter;
@@ -33,14 +39,13 @@ contract workToken is ERC721URIStorage, KeeperCompatibleInterface{
         tokenCounter = 0;
         startTotalJobCost = 55;
         jobLimit = 10;
-        //stableCoin = IERC20(_stableCoinAddress);
     }
 
-    function approveFunds() public {
-        stableCoin.approve(msg.sender, 1 * 10 ** 15);
+    function setTokenAddresses(address _stableCoinAddress) external onlyOwner{
+        stableCoin = IERC20(_stableCoinAddress);
     }
     
-    function mintNFT(address ProjectCreaterAddress) public returns (uint256){ // make payable, check job limit
+    function mintNFT(address ProjectCreaterAddress) public returns (uint256){//
         require(ProjectCreaters[ProjectCreaterAddress].jobsMinted <= ProjectCreaters[ProjectCreaterAddress].jobs);
         tokenIdToStatus[tokenCounter] = tokenStatus(0);
         tokenIdToProjectCreater[tokenCounter] = ProjectCreaterAddress;
@@ -51,10 +56,7 @@ contract workToken is ERC721URIStorage, KeeperCompatibleInterface{
 
         uint256 jobCost = 10 ** 6 * ProjectCreaters[ProjectCreaterAddress].totalJobCost / ProjectCreaters[ProjectCreaterAddress].jobs;
 
-        //require(stableCoin.balanceOf(msg.sender) > jobCost);
-        stableCoin.transferFrom(msg.sender, ProjectCreaterAddress, jobCost);// is this even safe?
-
-        //transfer payment
+        stableCoin.safeTransferFrom(msg.sender, ProjectCreaterAddress, jobCost);
 
         _safeMint(msg.sender, tokenCounter);
         _setTokenURI(tokenCounter, ProjectCreaters[ProjectCreaterAddress].tokenURI);
@@ -110,6 +112,7 @@ contract workToken is ERC721URIStorage, KeeperCompatibleInterface{
             ProjectCreaters[msg.sender].jobsCompleted = 0;
         }
     }
+
 
 
     function checkUpkeep(bytes calldata /*checkData*/) external view override returns (bool upkeepNeeded, bytes memory performData) {

@@ -1,4 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-ethers");
+require("@nomiclabs/hardhat-etherscan");
 require('dotenv').config()
 require('@openzeppelin/hardhat-upgrades');
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -23,6 +25,10 @@ module.exports = {
   networks: {
     hardhat: {
     },
+    mumbai: {
+      url: "https://matic-mumbai.chainstacklabs.com",
+      accounts: [process.env.PRIVATE_KEY]
+    },
     alfajores: {
       url: "https://alfajores-forno.celo-testnet.org",
       accounts: [process.env.PRIVATE_KEY],
@@ -46,6 +52,13 @@ module.exports = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts"
+  },
+  etherscan: {
+    apiKey: {        
+      //ethereum
+      //mainnet: "ETHERSCAN_API_KEY",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY
+    }
   },
   mocha: {
     timeout: 40000
