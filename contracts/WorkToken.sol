@@ -11,13 +11,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 struct ProjectCreator { 
-   uint256 totalJobCost;
-   uint16 jobs;
-   uint256 jobTimeLimit;
-   uint256[] jobsIssued;//?
-   string tokenURI;
-   uint16 jobsMinted;
-   uint16 jobsCompleted;
+    uint256 totalJobCost;
+    uint256 jobTimeLimit;
+    uint256[] jobsIssued;//?
+    string tokenURI;
+    uint16 jobs;
+    uint16 jobsMinted;
+    uint16 jobsCompleted;
 }
 
 contract WorkToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
@@ -35,11 +35,19 @@ contract WorkToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
 
     mapping(address => ProjectCreator) public projectCreators;
 
+    event MintNFT(string tokenURI);
+    event ProjectCreatorCreateProject(string tokenURI);
+    event FinishProject(uint256 jobIndex);
+
     constructor() ERC721("WorkToken","WRK"){
         tokenCounter = 0;
         startTotalJobCost = 55;
-        jobLimit = 10;
+        jobLimit = 50;
     }
+    modifier tokenOwner(uint256 jobIndex) {
+      require(msg.sender == ownerOf(jobIndex));
+      _;
+   }
 
     function setTokenAddresses(address _stableCoinAddress) external onlyOwner{
         stableCoin = IERC20(_stableCoinAddress);
@@ -57,7 +65,7 @@ contract WorkToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
         return tokenIdToStatus[tokenId];
     }
     
-    function mintNFT(address projectCreatorAddress) public returns (uint256){//
+    function mintNFT(address projectCreatorAddress) public {
         require(projectCreators[projectCreatorAddress].jobsMinted <= projectCreators[projectCreatorAddress].jobs);
         tokenIdToStatus[tokenCounter] = tokenStatus(0);
         tokenIdToProjectCreator[tokenCounter] = projectCreatorAddress;
@@ -72,45 +80,48 @@ contract WorkToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
 
         _safeMint(msg.sender, tokenCounter);
         _setTokenURI(tokenCounter, projectCreators[projectCreatorAddress].tokenURI);
+        
+        emit MintNFT(tokenURI(tokenCounter));
         tokenCounter++;
-        return tokenCounter - 1;
     }
 
     function newProjectCreator(uint16 jobs, uint256 jobTimeLimit, string memory tokenURI) public {
-        require(projectCreators[msg.sender].totalJobCost == 0);
+        require(projectCreators[msg.sender].totalJobCost == 0);//make sure ProjectCreator does not exest
         projectCreators[msg.sender].totalJobCost = startTotalJobCost;
         projectCreatorChangeJob(jobs, jobTimeLimit, tokenURI);
     }
 
     function projectCreatorChangeJob(uint16 jobs, uint256 jobTimeLimit, string memory tokenURI) public {
         require(jobs <= jobLimit && jobs > 0);
-        require(projectCreators[msg.sender].totalJobCost != 0);
+        require(projectCreators[msg.sender].totalJobCost != 0);//make sure ProjectCreator exests
         projectCreators[msg.sender].jobs = jobs;
         projectCreators[msg.sender].jobTimeLimit = jobTimeLimit;
         projectCreators[msg.sender].tokenURI = tokenURI;
-        projectCreators[msg.sender].jobsCompleted = 0;//jobsMinted
+        projectCreators[msg.sender].jobsCompleted = 0;
         projectCreators[msg.sender].jobsMinted = 0;
+        emit ProjectCreatorCreateProject(tokenURI);
     }
 
 
-    function completeJob(uint256 jobIndex) public { // add modifyer
+    function completeJob(uint256 jobIndex) public tokenOwner(jobIndex) { 
         address projectCreatorAddress = tokenIdToProjectCreator[jobIndex];
-        
+
+        //check if URIs match
+        require(keccak256(abi.encodePacked(projectCreators[projectCreatorAddress].tokenURI)) == keccak256(abi.encodePacked(tokenURI(jobIndex))));
+        projectCreators[projectCreatorAddress].jobsCompleted++;
         tokenIdToStatus[jobIndex] = tokenStatus(1);
-        if(keccak256(abi.encodePacked(projectCreators[projectCreatorAddress].tokenURI)) == keccak256(abi.encodePacked(tokenURI(jobIndex)))) {
-            projectCreators[projectCreatorAddress].jobsCompleted++;
-        }
+        emit FinishProject(uint256 jobIndex);
     }
 
-    function badJob(uint256 jobIndex) public { // add modifyer
+    function badJob(uint256 jobIndex) public tokenOwner(jobIndex) { 
         tokenIdToStatus[jobIndex] = tokenStatus(3);
     }
     
-    function upgradeProjectCreator() public {// add modifyer
-        if(projectCreators[msg.sender].jobsCompleted == projectCreators[msg.sender].jobs){
-            projectCreators[msg.sender].totalJobCost = projectCreators[msg.sender].totalJobCost * 3 / 2;
-            projectCreators[msg.sender].jobsCompleted = 0;
-        }
+    function upgradeProjectCreator() public {
+        require(projectCreators[msg.sender].jobsCompleted == projectCreators[msg.sender].jobs);
+        projectCreators[msg.sender].totalJobCost = projectCreators[msg.sender].totalJobCost * 5;
+        projectCreators[msg.sender].jobsCompleted = 0;
+        
     }
 
 
@@ -127,7 +138,10 @@ contract WorkToken is Ownable, ERC721URIStorage, KeeperCompatibleInterface{
 
     function performUpkeep(bytes calldata performData) external override {
         uint256 i = sliceUint(performData, 0);
-        tokenIdToStatus[i] = tokenStatus(2);
+        if(tokenIdToStatus[i] == tokenStatus(0) && tokenIdToExpiryTime[i] > block.timestamp){
+            tokenIdToStatus[i] = tokenStatus(2);
+            projectCreators[tokenIdToProjectCreator[i]].jobsCompleted++;
+        }
     }
 
     function sliceUint(bytes memory bs, uint start) internal pure returns (uint){
